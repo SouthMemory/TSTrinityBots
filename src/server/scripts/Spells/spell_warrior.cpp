@@ -30,6 +30,7 @@
 #include "SpellHistory.h"
 #include "SpellMgr.h"
 #include "SpellScript.h"
+// #include "Unit.h"
 
 enum WarriorSpells
 {
@@ -307,8 +308,10 @@ class spell_warr_execute : public SpellScript
         Unit* caster = GetCaster();
         if (Unit* target = GetHitUnit())
         {
+            int32 maxRageUsed = (target->GetHealthPct() < 20) ? 1000 : 500;
+
             SpellInfo const* spellInfo = GetSpellInfo();
-            int32 rageUsed = std::min<int32>(300 - spellInfo->CalcPowerCost(caster, SpellSchoolMask(spellInfo->SchoolMask)), caster->GetPower(POWER_RAGE));
+            int32 rageUsed = std::min<int32>(maxRageUsed - spellInfo->CalcPowerCost(caster, SpellSchoolMask(spellInfo->SchoolMask)), caster->GetPower(POWER_RAGE));
             int32 newRage = std::max<int32>(0, caster->GetPower(POWER_RAGE) - rageUsed);
 
             // Sudden Death rage save
