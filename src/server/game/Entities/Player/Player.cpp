@@ -2657,7 +2657,7 @@ void Player::InitTalentForLevel()
 {
     uint8 level = GetLevel();
     // talents base at level diff (talents = level - 9 but some can be used already)
-    if (level < 10)
+    if (level < 0)
     {
         // Remove all talent points
         if (m_usedTalentCount > 0)                           // Free any used talents
@@ -25303,7 +25303,8 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
 // @tswow-begin change layout to attach event
 uint32 Player::CalculateTalentsPoints() const
 {
-    uint32 base_talent = GetLevel() < 10 ? 0 : GetLevel() - 9;
+    // uint32 base_talent = GetLevel() < 10 ? 0 : GetLevel() - 9;
+    uint32 base_talent = GetLevel();
     uint32 out_talent;
 
     if (GetClass() != CLASS_DEATH_KNIGHT || GetMapId() != 609)
@@ -25312,7 +25313,7 @@ uint32 Player::CalculateTalentsPoints() const
     }
     else
     {
-        uint32 talentPointsForLevel = GetLevel() < 56 ? 0 : GetLevel() - 55;
+        uint32 talentPointsForLevel = GetLevel() < 56 ? 0 : GetLevel() - 45;
         talentPointsForLevel += m_questRewardTalentCount;
 
         if (talentPointsForLevel > base_talent)
