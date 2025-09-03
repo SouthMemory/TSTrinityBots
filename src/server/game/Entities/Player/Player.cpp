@@ -15382,6 +15382,22 @@ void Player::IncompleteQuest(uint32 quest_id)
 
 void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce)
 {
+    // 获取任务ID
+    uint32 questId = quest->GetQuestId();
+    
+    // 获取调整后的任务模板（可能为空）
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(
+        questId, GetLevel(), GetClass(), GetMostPointsTalentTree());
+    
+    // 决定最终使用的任务指针
+    Quest const* questToUse = adjustedQuest ? adjustedQuest : quest;
+    
+    // 委托给5参数版本，传递调整后的任务指针
+    RewardQuest(questToUse, reward, questGiver, announce, true); // 注意分号
+}
+
+void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce, bool adjusted)
+{
     //this THING should be here to protect code from quest, which cast on player far teleport as a reward
     //should work fine, cause far teleport will be executed in Player::Update()
     SetCanDelayTeleport(true);

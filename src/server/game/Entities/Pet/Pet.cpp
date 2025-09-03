@@ -1555,6 +1555,46 @@ void Pet::InitLevelupSpellsForLevel()
                 learnSpell(spellInfo->Id);
         }
     }
+
+    // 新增：查询 creature_template_spells 并进行学习或遗忘
+    if (GetCreatureTemplate()->spells)
+    {
+        for (uint32 spellId : GetCreatureTemplate()->spells) // 遍历模板技能列表
+        {
+            if (GetOwner() && GetOwner()->IsGameMaster())
+                LOG_ERROR("esp.InitLevelupSpellsForLevel", "Pet processing creature spell {}", spellId);
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId); // 获取技能信息
+            if (!spellInfo) // 如果技能信息不存在，跳过该技能
+                continue;
+
+            // 如果技能等级高于当前等级，遗忘技能
+            if (spellInfo->SpellLevel > level && sScriptMgr->CanUnlearnSpellDefault(this, spellInfo))
+                unlearnSpell(spellInfo->Id, true);
+            // 否则学习技能
+            else
+                learnSpell(spellInfo->Id);
+        }
+    }
+
+    // 基于creature的SmartAI，学习SmartAI中涉及的技能
+    std::string ai_name = GetCreatureTemplate()->AIName;
+    std::vector<uint32> smartSpells = sSmartScriptMgr->GetCreatureSmartAISpells(GetCreatureTemplate()->Entry);
+    for (uint32 spellId : smartSpells)
+    {
+        if (GetOwner() && GetOwner()->IsGameMaster())
+            LOG_ERROR("esp.InitLevelupSpellsForLevel", "Pet processing smart spell {}", spellId);
+        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId); // 获取技能信息
+        if (!spellInfo) // 如果技能信息不存在，跳过该技能
+            continue;
+
+        // 如果技能等级高于当前等级，遗忘技能
+        if (spellInfo->SpellLevel > level && sScriptMgr->CanUnlearnSpellDefault(this, spellInfo))
+            unlearnSpell(spellInfo->Id, true);
+        // 否则学习技能
+        else
+            learnSpell(spellInfo->Id);
+    }
+
 }
 
 bool Pet::unlearnSpell(uint32 spell_id, bool learn_prev, bool clear_ab)

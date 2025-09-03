@@ -1684,6 +1684,46 @@ class TC_GAME_API SmartAIMgr
         static SmartScriptHolder& FindLinkedSourceEvent(SmartAIEventList& list, uint32 eventId);
 
         static SmartScriptHolder& FindLinkedEvent(SmartAIEventList& list, uint32 link);
+
+        std::vector<uint32> GetCreatureSmartAISpells(int32 entry)
+        {
+
+            std::vector<uint32> spellList; // 用于存储符合条件的技能ID
+            if (mEventMap[SMART_SCRIPT_TYPE_CREATURE].find(entry) == mEventMap[SMART_SCRIPT_TYPE_CREATURE].end())
+            {
+                // LOG_ERROR("esp.GetCreatureSmartAISpells", "SmartAIMgr::GetCreatureSmartAISpells: No scripts found for Creature Entry {}.", entry);
+                return spellList; // 如果没有对应脚本，返回空列表
+            }
+
+            // 遍历指定实体的脚本列表
+            SmartAIEventList& eventList = mEventMap[SMART_SCRIPT_TYPE_CREATURE][entry];
+            for (const SmartScriptHolder& holder : eventList)
+            {
+                // log holder info
+                // LOG_ERROR("esp.GetCreatureSmartAISpells", "holder.entryOrGuid: {}, holder.source_type: {}, holder.event_id: {}, holder.action.type: {}", holder.entryOrGuid, holder.source_type, holder.event_id, holder.action.type);
+                // LOG_ERROR("esp.GetCreatureSmartAISpells", "holder.event.raw.param3 {} holder.event.raw.param4 {} holder.action.raw.param1 {}", holder.event.raw.param3, holder.event.raw.param4, holder.action.raw.param1);
+
+                // 条件过滤：source_type = 0, target_type = 11
+                if (holder.source_type == SMART_SCRIPT_TYPE_CREATURE && holder.action.type == 11)
+                {
+                    // 检查 action_param3 和 action_param4 是否大于0，以及 action_param1 是否不为0
+                    if ((holder.event.raw.param1 + holder.event.raw.param2 + holder.event.raw.param3 + holder.event.raw.param4) > 0 && holder.action.raw.param1 != 0)
+                    {
+                        // action_param1 即为技能ID，加入列表
+                        spellList.push_back(holder.action.raw.param1);
+                        // LOG_ERROR("esp.GetCreatureSmartAISpells", "Creature has smartai spell {}", holder.action.raw.param1);
+                    }
+                }
+            }
+
+            if (spellList.empty())
+            {
+                // LOG_ERROR("esp.GetCreatureSmartAISpells", "SmartAIMgr::GetCreatureSmartAISpells: No valid spells found for Creature Entry {}.", entry);
+            }
+
+            return spellList;
+        }
+
     private:
         //event stores
         SmartAIEventMap mEventMap[SMART_SCRIPT_TYPE_MAX];

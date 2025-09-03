@@ -36,6 +36,10 @@
 #include "TemporarySummon.h"
 #include "Vehicle.h"
 #include "World.h"
+#include <vector>
+#include <algorithm>
+#include <numeric>
+#include "GameTime.h" // 确保包含 GameTime 头文件
 
 AISpellInfoType* UnitAI::AISpellInfo;
 AISpellInfoType* GetAISpellInfo(uint32 i) { return &UnitAI::AISpellInfo[i]; }
@@ -125,10 +129,142 @@ void CreatureAI::MoveInLineOfSight_Safe(Unit* who)
     _moveInLOSLocked = false;
 }
 
+uint32 CreatureAI::MaxLevelOfNearByPlayers(float radius)
+{
+    std::vector<uint32> playerLevels;
+
+    // 遍历附近的玩家，记录所有玩家的等级
+    std::list<Player*> players;
+    Acore::AnyPlayerInObjectRangeCheck checker(me, radius);
+    Acore::PlayerListSearcher<Acore::AnyPlayerInObjectRangeCheck> searcher(me, players, checker);
+    Cell::VisitWorldObjects(me, searcher, radius);
+
+    for (Player* player : players)
+    {
+        playerLevels.push_back(player->GetLevel());
+    }
+
+    // 如果没有玩家，返回1
+    if (playerLevels.empty())
+    {
+        return 1;
+    }
+
+    // 按等级从高到低排序
+    std::sort(playerLevels.begin(), playerLevels.end(), std::greater<uint32>());
+
+    // 创建最大长度为5的等级列表
+    std::vector<uint32> selectedLevels;
+    if (!playerLevels.empty())
+    {
+        selectedLevels.push_back(playerLevels[0]);
+        for (size_t i = 1; i < playerLevels.size() && selectedLevels.size() < 5; ++i)
+        {
+            if (std::abs(static_cast<int>(playerLevels[i]) - static_cast<int>(selectedLevels[0])) <= 6)
+            {
+                selectedLevels.push_back(playerLevels[i]);
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    // 计算新列表的均值
+    if (selectedLevels.empty())
+    {
+        return 1;
+    }
+
+    uint32 sum = std::accumulate(selectedLevels.begin(), selectedLevels.end(), 0);
+    uint32 averageLevel = sum / selectedLevels.size();
+
+    // 确保averageLevel至少为1
+    if (averageLevel < 1)
+    {
+        averageLevel = 1;
+    }
+
+    return averageLevel;
+}
+
+// 升级生物到新等级
+void CreatureAI::LevelUpTo(int8 highestNearbyPlayerLevel)
+{
+    // 数值错误
+    if (highestNearbyPlayerLevel <= 1){
+        return;
+    }
+
+    int8 creatureDefaultLevel = me->getDefaultLevel(); // 获取生物默认等级
+    // 有些小动物默认等级为1，不做任何处理
+    if (creatureDefaultLevel == 1){
+        return;
+    }
+    
+    int8 creatureCurrentLevel = me->GetLevel(); // 获取生物当前等级
+    int8 minDefaultLevel = me->GetCreatureTemplate()->minlevel; // 获取生物最小等级
+    int8 maxDefaultLevel = me->GetCreatureTemplate()->maxlevel; // 获取生物最大等级
+    minDefaultLevel = std::max(minDefaultLevel, int8(1)); // 确保minDefaultLevel至少为1
+    maxDefaultLevel = std::max(maxDefaultLevel, minDefaultLevel); // 确保maxDefaultLevel至少为1
+
+    // 有主人的野怪，等级调整至主人等级
+    int8 ownerLevel = 0;
+    if (me->GetOwner() && (ownerLevel = me->GetOwner()->GetLevel())){
+        if (ownerLevel != creatureCurrentLevel){
+            LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to owner level {} from {}", me->GetSpawnId(), me->GetEntry(), ownerLevel, creatureCurrentLevel);
+            me->SelectLevel(true, ownerLevel, ownerLevel); 
+        }
+        return;
+    }
+
+    // 玩家等级在5级以下，恢复野怪等级至默认
+    if (highestNearbyPlayerLevel <= 5) {
+        if (creatureCurrentLevel < minDefaultLevel || creatureCurrentLevel > maxDefaultLevel) {
+            LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to default level {}-{} from {}", me->GetSpawnId(), me->GetEntry(), minDefaultLevel, maxDefaultLevel, creatureCurrentLevel);
+            me->SelectLevel(true, minDefaultLevel, maxDefaultLevel);
+        }
+        return;
+    }
+
+    // 玩家等级与生物当前等级相差不超过3级，不做任何处理
+    if (std::abs(highestNearbyPlayerLevel - creatureCurrentLevel) <= 2) {
+        return;
+    }
+
+    // 玩家等级小于野怪等级3级以上，野怪调整至默认等级
+    if (highestNearbyPlayerLevel < creatureCurrentLevel - 2) {
+        if (creatureCurrentLevel < minDefaultLevel || creatureCurrentLevel > maxDefaultLevel) {
+            LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to default level {}-{} from {}", me->GetSpawnId(), me->GetEntry(), minDefaultLevel, maxDefaultLevel, creatureCurrentLevel);
+            me->SelectLevel(true, minDefaultLevel, maxDefaultLevel);
+        }
+        return;
+    }
+
+    // 野怪等级小于玩家等级3级以上，调整至玩家等级-3到+3范围内
+    if (highestNearbyPlayerLevel > creatureCurrentLevel + 2) {
+        int8 newLevel = highestNearbyPlayerLevel - 2 + rand() % 5; // 在玩家等级-3到+3范围内随机调整
+        newLevel = std::max(newLevel, int8(creatureCurrentLevel + 1)); // 确保新等级高于当前等级
+        LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to higher level {} from {}", me->GetSpawnId(), me->GetEntry(), newLevel, creatureCurrentLevel);
+        me->SelectLevel(true, newLevel, newLevel);
+        return;
+    }
+}
+
 void CreatureAI::MoveInLineOfSight(Unit* who)
 {
     if (me->IsEngaged())
         return;
+
+    time_t curTime = GameTime::GetGameTime().count(); // 获取当前时间
+
+    // 检查时间间隔是否超过1秒
+    if (curTime - lastLevelUpTime >= 1) {
+        uint8 playerLevel = MaxLevelOfNearByPlayers(100.0f);
+        LevelUpTo(playerLevel);
+        lastLevelUpTime = curTime; // 更新上次调整等级的时间
+    }
 
     if (me->HasReactState(REACT_AGGRESSIVE) && me->CanStartAttack(who, false))
         me->EngageWithTarget(who);

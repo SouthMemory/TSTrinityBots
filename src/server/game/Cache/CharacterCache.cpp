@@ -257,6 +257,17 @@ uint8 CharacterCache::GetCharacterLevelByGuid(ObjectGuid guid) const
     return itr->second.Level;
 }
 
+uint8 CharacterCache::GetCharacterClassByGuid(ObjectGuid guid) const
+{
+    auto itr = _characterCacheStore.find(guid);
+    if (itr == _characterCacheStore.end())
+    {
+        return 0;
+    }
+
+    return itr->second.Class;
+}
+
 ObjectGuid::LowType CharacterCache::GetCharacterGuildIdByGuid(ObjectGuid guid) const
 {
     auto itr = _characterCacheStore.find(guid);

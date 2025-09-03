@@ -399,6 +399,9 @@ void PlayerMenu::SendQuestGiverQuestDetails(Quest const* quest, ObjectGuid npcGU
 {
     WorldPackets::Quest::QuestGiverQuestDetails packet;
 
+    uint32 questId = quest->GetQuestId();
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMostPointsTalentTree());
+
     packet.Title = quest->GetTitle();
     packet.Details = quest->GetDetails();
     packet.Objectives = quest->GetObjectives();
@@ -421,7 +424,8 @@ void PlayerMenu::SendQuestGiverQuestDetails(Quest const* quest, ObjectGuid npcGU
     packet.Flags = quest->GetFlags() & (sWorld->getBoolConfig(CONFIG_QUEST_IGNORE_AUTO_ACCEPT) ? ~QUEST_FLAGS_AUTO_ACCEPT : ~0);
     packet.SuggestedGroupNum = quest->GetSuggestedPlayers();
 
-    quest->BuildQuestRewards(packet.Rewards, _session->GetPlayer());
+    // quest->BuildQuestRewards(packet.Rewards, _session->GetPlayer());
+    adjustedQuest->BuildQuestRewards(packet.Rewards, _session->GetPlayer());
 
     packet.DescEmotes.reserve(QUEST_EMOTE_COUNT);
     for (uint32 i = 0; i < QUEST_EMOTE_COUNT; ++i)
@@ -434,11 +438,15 @@ void PlayerMenu::SendQuestGiverQuestDetails(Quest const* quest, ObjectGuid npcGU
 
 void PlayerMenu::SendQuestQueryResponse(Quest const* quest) const
 {
+    uint32 questId = quest->GetQuestId();
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMostPointsTalentTree());
+
     if (sWorld->getBoolConfig(CONFIG_CACHE_DATA_QUERIES))
         _session->SendPacket(&quest->QueryData[static_cast<uint32>(_session->GetSessionDbLocaleIndex())]);
     else
     {
-        WorldPacket queryPacket = quest->BuildQueryData(_session->GetSessionDbLocaleIndex());
+        // WorldPacket queryPacket = quest->BuildQueryData(_session->GetSessionDbLocaleIndex());
+        WorldPacket queryPacket = adjustedQuest->BuildQueryData(_session->GetSessionDbLocaleIndex());
         _session->SendPacket(&queryPacket);
     }
 
@@ -448,6 +456,9 @@ void PlayerMenu::SendQuestQueryResponse(Quest const* quest) const
 void PlayerMenu::SendQuestGiverOfferReward(Quest const* quest, ObjectGuid npcGUID, bool autoLaunched) const
 {
     WorldPackets::Quest::QuestGiverOfferRewardMessage packet;
+
+    uint32 questId = quest->GetQuestId();
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMostPointsTalentTree());
 
     packet.Title = quest->GetTitle();
     packet.RewardText = quest->GetOfferRewardText();
@@ -471,7 +482,8 @@ void PlayerMenu::SendQuestGiverOfferReward(Quest const* quest, ObjectGuid npcGUI
     for (uint32 i = 0; i < QUEST_EMOTE_COUNT && quest->OfferRewardEmote[i]; ++i)
         packet.Emotes.emplace_back(quest->OfferRewardEmote[i], quest->OfferRewardEmoteDelay[i]);
 
-    quest->BuildQuestRewards(packet.Rewards, _session->GetPlayer(), true);
+    // quest->BuildQuestRewards(packet.Rewards, _session->GetPlayer(), true);
+    adjustedQuest->BuildQuestRewards(packet.Rewards, _session->GetPlayer(), true);
 
     _session->SendPacket(packet.Write());
 

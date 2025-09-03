@@ -206,7 +206,10 @@ uint32 Quest::GetXPReward(Player const* player) const
 {
     if (player)
     {
-        int32 quest_level = (_level == -1 ? player->GetLevel() : _level);
+        // int32 quest_level = (_level == -1 ? player->GetLevel() : _level);
+        // 所有任务基于当前玩家等级计算经验
+        int32 quest_level = (_level == -1 ? player->GetLevel() : std::max(player->GetLevel(), uint8(_level)));
+
         QuestXPEntry const* xpentry = sQuestXPStore.LookupEntry(quest_level);
         if (!xpentry)
             return 0;
@@ -380,6 +383,23 @@ bool Quest::CanIncreaseRewardedQuestCounters() const
     // Dungeon Finder/Daily/Repeatable (if not weekly, monthly or seasonal) quests are never considered rewarded serverside.
     // This affects counters and client requests for completed quests.
     return (!IsDFQuest() && !IsDaily() && (!IsRepeatable() || IsWeekly() || IsMonthly() || IsSeasonal()));
+}
+
+void Quest::AddQuestRewardItem(uint32 itemId, uint32 count, bool isChoiceReward){
+    if (isChoiceReward){
+        if (_rewChoiceItemsCount >= QUEST_REWARD_CHOICES_COUNT)
+            return;
+        RewardChoiceItemId[_rewChoiceItemsCount] = itemId;
+        RewardChoiceItemCount[_rewChoiceItemsCount] = count;
+        ++_rewChoiceItemsCount;
+    } else {
+        if (_rewItemsCount >= QUEST_REWARDS_COUNT)
+            return;
+        RewardItemId[_rewItemsCount] = itemId;
+        RewardItemIdCount[_rewItemsCount] = count;
+        ++_rewItemsCount;
+        LOG_INFO("esp.quest_boost", "_rewItemsCount is {} for quest {}", _rewItemsCount, Id);
+    }
 }
 
 void Quest::InitializeQueryData()

@@ -907,6 +907,13 @@ enum SkillRangeType
     SKILL_RANGE_NONE                                        // 0..0 always
 };
 
+enum EquipPhyOrSpell
+{
+    EQUIP_UNK,
+    EQUIP_PHY,
+    EQUIP_SPE,
+};
+
 SkillRangeType GetSkillRangeType(SkillRaceClassInfoEntry const* rcEntry);
 
 #define MAX_PLAYER_NAME          12                         // max allowed by client name length
@@ -1033,6 +1040,13 @@ class TC_GAME_API ObjectMgr
 
         uint32 GetModelForTotem(SummonSlot totemSlot, Races race) const;
 
+        // 用于存储从数据库加载的boost数据
+        static std::unordered_map<uint32_t, std::unordered_map<uint64_t, uint32_t>> LoadedBoostData;
+
+        void LoadQuestRewardItemBoostData();
+        void SaveQuestRewardItemBoostData(uint32_t originalItemEntry, uint32_t playerLevel, uint32_t playerClass, uint8_t playerSpec, uint32_t boostedItemEntry);
+
+
         ItemSetNameEntry const* GetItemSetNameEntry(uint32 itemId) const
         {
             ItemSetNameContainer::const_iterator itr = _itemSetNameStore.find(itemId);
@@ -1100,9 +1114,27 @@ class TC_GAME_API ObjectMgr
         }
         CreatureQuestItemMap const* GetCreatureQuestItemMap() const { return &_creatureQuestItemStore; }
 
+
+        void SaveQuestRewardItemBoostData(uint32_t originalItemEntry, uint32_t playerLevel, uint32_t playerClass, uint8_t playerSpec, uint32_t boostedItemEntry);
+        void LoadQuestRewardItemBoostData();
+
+        [[nodiscard]] EquipPhyOrSpell PlayerPhysicalOrMagicEquipNeeded(uint32 player_level, uint8 player_class, uint8 player_spec) const;
+        [[nodiscard]] EquipPhyOrSpell IsPhysicalEquip(uint32 itemId) const;
+        ItemSubclassArmor GetArmorSubclassForClassAndLevel(Classes player_class, int player_level);
+
+        [[nodiscard]] Quest const * GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, uint32    player_level, uint8 player_class, uint8 player_spec);
+
+
         uint32 GetNearestTaxiNode(float x, float y, float z, uint32 mapid, uint32 team);
         void GetTaxiPath(uint32 source, uint32 destination, uint32 &path, uint32 &cost);
         uint32 GetTaxiMountDisplayId(uint32 id, uint32 team, bool allowed_alt_team = false);
+
+        ItemSubclassArmor GetArmorSubclassForClassAndLevel(Classes player_class, int player_level);
+        [[nodiscard]] Quest const* GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, uint32 player_level, uint8 player_class, uint8 player_spec);
+
+        [[nodiscard]] EquipPhyOrSpell PlayerPhysicalOrMagicEquipNeeded(uint32 player_level, uint8 player_class, uint8 player_spec) const;
+
+        [[nodiscard]] EquipPhyOrSpell IsPhysicalEquip(uint32 itemId) const;
 
         Quest const* GetQuestTemplate(uint32 quest_id) const;
 

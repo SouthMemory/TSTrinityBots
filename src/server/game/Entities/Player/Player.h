@@ -1257,7 +1257,10 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
         void AbandonQuest(uint32 quest_id);
         void CompleteQuest(uint32 quest_id);
         void IncompleteQuest(uint32 quest_id);
+        // 默认版本
         void RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce = true);
+        // 版本2：接受5个参数，且第5个参数没有默认值
+        void RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce, bool adjusted); // adjusted 无默认值
         void SetRewardedQuest(uint32 quest_id);
         void FailQuest(uint32 quest_id);
         bool SatisfyQuestSkill(Quest const* qInfo, bool msg) const;

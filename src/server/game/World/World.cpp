@@ -1792,6 +1792,9 @@ void World::SetInitialWorldSettings()
     sObjectMgr->LoadCustomItemTemplates();
     // @tswow-end
 
+    LOG_INFO("server.loading", "Loading Quest Reward Item Boost Data...");
+    sObjectMgr->LoadQuestRewardItemBoostData();
+
     TC_LOG_INFO("server.loading", "Loading Item set names...");                // must be after LoadItemPrototypes
     sObjectMgr->LoadItemSetNames();
 

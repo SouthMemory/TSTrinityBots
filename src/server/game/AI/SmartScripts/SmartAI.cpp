@@ -453,6 +453,7 @@ void SmartAI::MoveInLineOfSight(Unit* who)
 {
     if (!who)
         return;
+    CreatureAI::MoveInLineOfSight(who);
 
     GetScript()->OnMoveInLineOfSight(who);
 

@@ -5307,6 +5307,22 @@ void ObjectMgr::GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, Play
         *info = pInfo->levelInfo[level - 1];
     else
         BuildPlayerLevelInfo(race, class_, level, info);
+
+    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry(level-1);
+    GtChanceToMeleeCritEntry     const* critRatio_80 = sGtChanceToMeleeCritStore.LookupEntry(79);
+
+    float stats_level_multiplier = critRatio_80->ratio / critRatio->ratio;
+
+    if (level == 1 || level == 80){
+        LOG_DEBUG("esp.GetPlayerLevelInfo", "critRatio->rator {}, critRatio_80->ratio {}, stats_level_multiplier {}", critRatio->ratio, critRatio_80->ratio, stats_level_multiplier);
+    }
+
+    // 对基础属性进行额外加成
+    info->stats[STAT_STRENGTH] += 5 * level * stats_level_multiplier;
+    info->stats[STAT_AGILITY] += 5 * level * stats_level_multiplier;
+    info->stats[STAT_STAMINA] += 5 * level * stats_level_multiplier;
+    info->stats[STAT_INTELLECT] += 5 * level * stats_level_multiplier;
+    info->stats[STAT_SPIRIT] += 5 * level * stats_level_multiplier;
 }
 
 void ObjectMgr::BuildPlayerLevelInfo(uint8 race, uint8 _class, uint8 level, PlayerLevelInfo* info) const
@@ -6176,6 +6192,487 @@ void ObjectMgr::LoadQuestLocales()
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded {} Quest locale strings in {} ms", uint32(_questLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
+}
+
+
+ItemSubclassArmor ObjectMgr::GetArmorSubclassForClassAndLevel(Classes player_class, int player_level)
+{
+    switch (player_class)
+    {
+        case CLASS_WARRIOR:
+        case CLASS_PALADIN:
+        case CLASS_DEATH_KNIGHT:
+            if (player_level >= 40)
+                return ITEM_SUBCLASS_ARMOR_PLATE;
+            return ITEM_SUBCLASS_ARMOR_MAIL;
+        
+        case CLASS_HUNTER:
+        case CLASS_SHAMAN:
+            if (player_level >= 40)
+                return ITEM_SUBCLASS_ARMOR_MAIL;
+            return ITEM_SUBCLASS_ARMOR_LEATHER;
+
+        case CLASS_ROGUE:
+        case CLASS_DRUID:
+            return ITEM_SUBCLASS_ARMOR_LEATHER;
+        
+        case CLASS_PRIEST:
+        case CLASS_MAGE:
+        case CLASS_WARLOCK:
+            return ITEM_SUBCLASS_ARMOR_CLOTH;
+
+        default:
+            return ITEM_SUBCLASS_ARMOR_MISC;
+    }
+}
+
+void ObjectMgr::LoadQuestRewardItemBoostData()
+{
+    // 清除之前加载的数据
+    LoadedBoostData.clear();
+
+    // 从表格 quest_reward_item_boost 中加载数据
+    QueryResult result = WorldDatabase.Query("SELECT original_item_entry, player_level, player_class, player_spec, boosted_item_entry FROM quest_reward_item_boost");
+
+    if (!result)
+    {
+        LOG_INFO("sql.sql", "No records to load from quest_reward_item_boost table.");
+        return;
+    }
+
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32_t originalItemEntry = fields[0].GetUInt32(); // 原始物品 ID
+        uint32_t playerLevel = fields[1].GetUInt32();       // 玩家等级
+        uint32_t playerClass = fields[2].GetUInt32();       // 玩家职业
+        uint8_t playerSpec = fields[3].GetUInt8();          // 玩家天赋分支
+        uint32_t boostedItemEntry = fields[4].GetUInt32();  // 提升后的物品 ID
+
+        // 生成内层键值
+        uint64_t key = (static_cast<uint64_t>(playerLevel) << 16) | (playerClass << 8) | playerSpec;
+
+        // 将数据存储在内存中，方便查询
+        LoadedBoostData[originalItemEntry][key] = boostedItemEntry;
+    } while (result->NextRow());
+
+    LOG_INFO("server.loading", "Loaded {} quest reward item boost records.", result->GetRowCount());
+}
+
+void ObjectMgr::SaveQuestRewardItemBoostData(uint32_t originalItemEntry, uint32_t playerLevel, uint32_t playerClass, uint8_t playerSpec, uint32_t boostedItemEntry)
+{
+    // 保存到数据库
+    WorldDatabase.Execute(
+        "REPLACE INTO quest_reward_item_boost (original_item_entry, player_level, player_class, player_spec, boosted_item_entry) "
+        "VALUES ({}, {}, {}, {}, {})",
+        originalItemEntry, playerLevel, playerClass, playerSpec, boostedItemEntry
+    );
+
+    // 同时更新内存中的数据
+    uint64_t key = (static_cast<uint64_t>(playerLevel) << 16) | (playerClass << 8) | playerSpec;
+    LoadedBoostData[originalItemEntry][key] = boostedItemEntry;
+
+    LOG_INFO("sql.sql", "Saved boosted item data: originalItemEntry={}, playerLevel={}, playerClass={}, playerSpec={}, boostedItemEntry={}", 
+             originalItemEntry, playerLevel, playerClass, playerSpec, boostedItemEntry);
+}
+
+EquipPhyOrSpell ObjectMgr::IsPhysicalEquip(uint32 itemId) const {
+    ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId);
+    if (!proto) {
+        return EQUIP_UNK;
+    }
+
+    // 获取装备的物理属性之和，法术属性之和，进行比较，判定是物理装备还是法系装备
+    int32 physicalStats = 0;
+    int32 spellStats = 0;
+
+    for (uint8 i = 0; i != MAX_ITEM_PROTO_STATS; ++i)
+    {
+        if (i >= proto->StatsCount)
+            continue;
+        uint32 statType = proto->ItemStat[i].ItemStatType;
+        if (statType == ItemModType::ITEM_MOD_AGILITY || statType == ItemModType::ITEM_MOD_STRENGTH)
+        {
+            physicalStats += proto->ItemStat[i].ItemStatValue;
+        }
+        else if (statType == ItemModType::ITEM_MOD_INTELLECT || statType == ItemModType::ITEM_MOD_SPIRIT)
+        {
+            spellStats += proto->ItemStat[i].ItemStatValue;
+        }
+    }
+
+    if (physicalStats + spellStats == 0) {
+        return EQUIP_UNK; // 未知类型
+    }
+
+    // LOG_ERROR("esp.ObjectMgr", "Item {} has {} physical and {} spell stat points, so it is a {} equip",
+    //     itemId, physicalStats, spellStats, physicalStats >= spellStats ? "physical" : "spell");
+
+    return physicalStats >= spellStats ? EQUIP_PHY : EQUIP_SPE;
+}
+
+EquipPhyOrSpell ObjectMgr::PlayerPhysicalOrMagicEquipNeeded(uint32 player_level, uint8 player_class, uint8 player_spec) const {
+    // 根据职业和天赋分支返回装备需求类型
+    switch (player_class)
+    {
+        case CLASS_WARRIOR:
+            // 战士所有天赋都是物理系
+            return EQUIP_PHY;
+
+        case CLASS_PALADIN:
+            if (player_spec == 0) // 神圣
+                return EQUIP_SPE; // 法系
+            else // 防护 & 惩戒
+                return EQUIP_PHY; // 物理
+
+        case CLASS_HUNTER:
+            // 猎人所有天赋都是物理系
+            return EQUIP_PHY;
+
+        case CLASS_ROGUE:
+            // 盗贼所有天赋都是物理系
+            return EQUIP_PHY;
+
+        case CLASS_PRIEST:
+            // 牧师所有天赋都是法系
+            return EQUIP_SPE;
+
+        case CLASS_DEATH_KNIGHT:
+            // 死亡骑士所有天赋都是物理系
+            return EQUIP_PHY;
+
+        case CLASS_SHAMAN:
+            if (player_spec == 0) // 元素
+                return EQUIP_SPE; // 法系
+            else if (player_spec == 1) // 增强
+                return EQUIP_PHY; // 物理
+            else if (player_spec == 2) // 恢复
+                return EQUIP_SPE; // 法系
+
+        case CLASS_MAGE:
+            // 法师所有天赋都是法系
+            return EQUIP_SPE;
+
+        case CLASS_WARLOCK:
+            // 术士所有天赋都是法系
+            return EQUIP_SPE;
+
+        case CLASS_DRUID:
+            if (player_spec == 0) // 平衡
+                return EQUIP_SPE; // 法系
+            else if (player_spec == 1) // 野性战斗
+                return EQUIP_PHY; // 物理
+            else if (player_spec == 2) // 恢复
+                return EQUIP_SPE; // 法系
+
+        default:
+            break;
+    }
+
+    // 未知类型
+    return EQUIP_UNK;
+}
+
+// 根据玩家的等级和职业，获取对应的Quest对象
+Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, uint32 player_level, uint8 player_class, uint8 player_spec) {
+    if (quest_id >= _questTemplatesFast.size()) {
+        return nullptr;
+    }
+
+    // 取出对应的Quest对象指针
+    Quest const* originalQuest = _questTemplatesFast[quest_id];
+    if (!originalQuest) {
+        return nullptr;
+    }
+    if (originalQuest->Title == "Awakener Purge - The Ultimate Weapon@Lev60" ||
+        originalQuest->Title == "Awakener Purge - The Ultimate Weapon@Lev70" ||
+        originalQuest->Title == "Awakener Purge - The Ultimate Weapon@Lev80")
+    {
+        return originalQuest;
+    }
+
+    player_level = int8(player_level);
+
+    // 当originalQuest->GetQuestLevel()是-1的时候，会数值错误，因为uint32是无符号数，而-1会被转换成一个很大的数
+    if (originalQuest->GetQuestLevel() >= 5 && player_level < originalQuest->GetQuestLevel()) {
+        player_level = originalQuest->GetQuestLevel();
+    }
+
+    EquipPhyOrSpell equipTypePreferred = PlayerPhysicalOrMagicEquipNeeded(player_level, player_class, player_spec);
+
+    LOG_ERROR("esp.ObjectMgr", "Player level: {}, class: {}, spec: {}, equip type: {}", player_level, player_class, player_spec, equipTypePreferred == EQUIP_PHY ? "physical" : equipTypePreferred == EQUIP_SPE ? "spell" : "unknown");
+
+    // 复制Quest对象
+    Quest* modifiedQuest = new Quest(*originalQuest);
+    uint32 newRewardChoiceItemIds[QUEST_REWARD_CHOICES_COUNT] = {0};
+    uint32 newRewardItemIds[QUEST_REWARDS_COUNT] = {0};  
+    ItemSubclassArmor armorSubclass = GetArmorSubclassForClassAndLevel(static_cast<Classes>(player_class), player_level);
+    std::vector<uint32> selectedEntries;
+
+    // 替换奖励物品的公共函数
+    auto replaceRewardItem = [&](uint32 oldItemId, uint32 i, uint32* newItemIdsArray) {
+        // 先检查缓存的boost数据
+        auto boostIt = LoadedBoostData.find(oldItemId);
+        if (boostIt != LoadedBoostData.end())
+        {
+            // uint32 key = (player_level << 8) | player_class;
+            uint64 key = (static_cast<uint64_t>(player_level) << 16) | (player_class << 8) | player_spec;
+            auto playerBoostIt = boostIt->second.find(key);
+            if (playerBoostIt != boostIt->second.end())
+            {
+                // 如果在缓存中找到，则直接使用
+                newItemIdsArray[i] = playerBoostIt->second;
+                selectedEntries.push_back(newItemIdsArray[i]);
+                LOG_INFO("esp.quest_boost", "Quest {}'s reward item {} boosted to {} with cache", quest_id, oldItemId, newItemIdsArray[i]);
+                return true;
+            }
+        }
+
+        // 没有找到boost数据，动态生成
+        ItemTemplate const* item = sObjectMgr->GetItemTemplate(oldItemId);
+        if (!item)
+        {
+            return false;
+        }
+        // 获取对象的class和subclass
+        uint32 itemClass = item->Class;
+        uint32 itemSubclass = item->SubClass;
+        uint8 itemQuality = item->Quality;
+        uint8 inventoryType = item->InventoryType;
+        uint8 itemLevel = item->ItemLevel;
+
+        if (itemClass == ITEM_CLASS_ARMOR)
+        {
+            if (itemSubclass == ITEM_SUBCLASS_ARMOR_CLOTH || itemSubclass == ITEM_SUBCLASS_ARMOR_LEATHER ||
+                itemSubclass == ITEM_SUBCLASS_ARMOR_MAIL || itemSubclass == ITEM_SUBCLASS_ARMOR_PLATE)
+                itemSubclass = armorSubclass;
+        }
+
+        // 查询数据库获取新的ItemId
+        // 1.item的RequiredLevel为player_level±3
+        // 2.class和subclass和原item一样
+        // 3.不是原有的ItemId
+        // 4.itemQuality += 1
+        // 非装绑物品（可以避免一些无效装备，特别是抗性装）
+        // 构建一次查询，获取所有可能的结果
+
+        // 预先计算上下限，避免让 SQL 处理
+        int32 min_level = std::max(int8(player_level) - 5, 1);
+        int32 max_level = player_level + 5;
+        std::string query = fmt::format(
+            "SELECT entry, Quality, ItemLevel, requiredlevel "
+            "FROM item_template "
+            "WHERE class = {} "
+            "AND subclass = {} "
+            "AND Flags <> 36864 " // 排除各种声望、荣誉装备
+            "AND StatsCount >= 1 "
+            "AND RequiredLevel >= 1 "
+            "AND RequiredSkill = 0 " // 排除各种专业制造装备
+            "AND RequiredSkillRank = 0 "
+            "AND requiredspell = 0 "
+            "AND InventoryType = {} "
+            "AND entry <> {} "
+            "AND BuyPrice > 0 "
+            "AND SellPrice > 0 "
+            "AND ItemLevel >= {} "
+            "AND (requiredlevel BETWEEN {} AND {}) "
+            "AND itemset = 0 ", 
+            itemClass,
+            itemSubclass,
+            inventoryType,
+            oldItemId,
+            itemLevel,
+            min_level,
+            max_level);
+        // LOG_ERROR("sql.sql", "query for quest {}: {}", quest_id, query.c_str());
+
+        // 执行查询
+        QueryResult result = WorldDatabase.Query(query.c_str());
+
+        if (!result)
+        {
+            LOG_INFO("esp.quest_boost", "No suitable items queried for quest {}: {}", quest_id, query.c_str());
+            return false;
+        }
+
+        // 属性类型相同的装备
+        std::vector<std::tuple<uint32, uint32, uint32>> AItems;
+        // 属性类型不同的装备
+        std::vector<std::tuple<uint32, uint32, uint32>> BItems;
+
+        AItems.reserve(result->GetRowCount());
+        BItems.reserve(result->GetRowCount());
+
+        // 遍历查询结果并进行额外判断
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 entry = fields[0].Get<uint32>();
+            uint32 quality = uint32(fields[1].Get<uint8>());
+            uint32 itemLevel = uint32(fields[2].Get<uint16>());
+            uint32 requiredLevel = uint32(fields[3].Get<uint8>());
+
+            // 额外的过滤条件
+            if (quality == 4 && (
+                    (itemLevel >= 76 && itemLevel <= 92) ||
+                    (itemLevel >= 125 && itemLevel <= 164) ||
+                    itemLevel >= 213))
+            {
+                continue; // 跳过不符合条件的记录
+            }
+
+            // 根据物理装备与否进行分类
+            if (IsPhysicalEquip(entry) == equipTypePreferred)
+            {
+                AItems.emplace_back(entry, quality, requiredLevel);
+            }
+            else
+            {
+                BItems.emplace_back(entry, quality, requiredLevel);
+            }
+        } while (result->NextRow());
+
+        // 合并两个结果集
+        std::vector<std::tuple<uint32, uint32, uint32>> items;
+        items.reserve(AItems.size() + BItems.size());
+
+        // 将两个容器合并
+        std::move(AItems.begin(), AItems.end(), std::back_inserter(items));
+        std::move(BItems.begin(), BItems.end(), std::back_inserter(items));
+
+        // 现在 items 包含了合并后的结果
+        if (items.empty())
+        {
+            LOG_INFO("esp.quest_boost", "No suitable items filtered for quest {}", quest_id);
+            return false;
+        }
+
+        uint32 selectedEntry = 0;
+        uint32 maxQualityOffset = quest_id>=26100 ? 0 : 1; //26100 and later quests are not boosted with quality
+        // 使用嵌套循环按照 range 和 qualityOffset 查找符合条件的结果
+        for (int range = 1; range <= 5; ++range)
+        {
+            for (int qualityOffset = maxQualityOffset; qualityOffset >= 0; --qualityOffset)
+            {
+                uint32 targetQuality = std::min(itemQuality + qualityOffset, 4);
+                int8 minLevel = int8(player_level) - range;
+                int8 maxLevel = int8(player_level) + range;
+
+                for (const auto& item : items)
+                {
+                    uint32 entry, quality, requiredlevel;
+                    std::tie(entry, quality, requiredlevel) = item;
+                    
+                    if (std::find(selectedEntries.begin(), selectedEntries.end(), entry) != selectedEntries.end())
+                    {
+                        continue; // 如果已选则跳过
+                    }
+
+                    if (quality == targetQuality && requiredlevel >= minLevel && requiredlevel <= maxLevel)
+                    {
+                        selectedEntry = entry;
+                        break;
+                    }
+                }
+
+                if (selectedEntry)
+                    break;
+            }
+
+            if (selectedEntry)
+                break;
+        }
+
+        if (!selectedEntry)
+        {
+            LOG_INFO("esp.quest_boost", "No boosting item available for quest {}'s reward {}", quest_id, oldItemId);
+            return false;
+        }
+
+        newItemIdsArray[i] = selectedEntry;
+        selectedEntries.push_back(selectedEntry);
+        SaveQuestRewardItemBoostData(oldItemId, player_level, player_class, player_spec, selectedEntry);
+        LOG_INFO("esp.quest_boost", "quest {}'s reward item {} boosted to {} for player class {} @Lev{}", quest_id, oldItemId, selectedEntry, player_class, player_level);
+        return true;
+    };
+
+    // 处理 RewardChoiceItemId 和 RewardItemId
+    for (uint32 i = 0; i < QUEST_REWARD_CHOICES_COUNT; ++i)
+    {
+        uint32 oldItemId = modifiedQuest->RewardChoiceItemId[i];
+        if (oldItemId != 0)
+        {
+            // LOG_ERROR("sql.sql", "oldItemId is 0 for quest {}", quest_id);
+            replaceRewardItem(oldItemId, i, newRewardChoiceItemIds);
+        }
+    }
+
+    for (uint32 i = 0; i < QUEST_REWARDS_COUNT; ++i)
+    {
+        uint32 oldItemId = modifiedQuest->RewardItemId[i];
+        if (oldItemId != 0)
+        {
+            // LOG_ERROR("sql.sql", "oldItemId is 0 for quest {}", quest_id);
+            replaceRewardItem(oldItemId, i, newRewardItemIds);
+        }
+    }
+
+    // 根据奖励物品数量，决定替换还是追加
+    if (modifiedQuest->GetRewChoiceItemsCount() >= 4){
+        // 替换
+        uint32 idx = 0;
+        for (uint32 newItemId : newRewardChoiceItemIds){
+            if (newItemId != 0)
+            {
+                modifiedQuest->RewardChoiceItemId[idx] = newItemId;
+            }
+            idx += 1;
+        }
+    } else {
+        // 追加
+        for (uint32 newItemId : newRewardChoiceItemIds){
+            if (newItemId != 0)
+            {
+                modifiedQuest->AddQuestRewardItem(newItemId, 1, true);
+            }
+        }
+    }
+
+    // 根据奖励物品数量，决定替换还是追加
+    if (modifiedQuest->GetRewItemsCount() >= 3){
+        // 替换
+        uint32 idx = 0;
+        for (uint32 newItemId : newRewardItemIds){
+            if (newItemId != 0)
+            {
+                modifiedQuest->RewardItemId[idx] = newItemId;
+            }
+            idx += 1;
+        }
+    } else {
+        // 追加
+        for (uint32 newItemId : newRewardItemIds){
+            if (newItemId != 0)
+            {
+                modifiedQuest->AddQuestRewardItem(newItemId, 1, false);
+            }
+        }
+    }
+
+
+
+    // log all RewardChoiceItemId
+    for (uint32 i = 0; i < QUEST_REWARD_CHOICES_COUNT; ++i){
+        LOG_INFO("esp.quest_boost", "Final ItemId 【choice】 for quest {}: {}", quest_id, modifiedQuest->RewardChoiceItemId[i]);
+    }
+
+    for (uint32 i = 0; i < QUEST_REWARDS_COUNT; ++i){
+        LOG_INFO("esp.quest_boost", "Final ItemId 【no choice】for quest {}: {}", quest_id, modifiedQuest->RewardItemId[i]);
+    }
+
+    modifiedQuest->InitializeQueryData();
+    // 返回修改后的副本
+    return modifiedQuest;
 }
 
 void ObjectMgr::LoadScripts(ScriptsType type)
