@@ -1537,7 +1537,10 @@ void Creature::SelectLevel(bool changelevel, uint8 minLevel, uint8 maxLevel)
     uint8 level = (minLevel == maxLevel) ? minLevel : urand(minLevel, maxLevel);
 
     if (changelevel)
+    {
         SetLevel(level);
+        UpdateLevelDependantStats();
+    }
 }
 // @enlight-end
 
