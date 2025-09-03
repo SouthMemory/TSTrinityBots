@@ -206,9 +206,11 @@ uint32 Quest::GetXPReward(Player const* player) const
 {
     if (player)
     {
+        // @enlight-begin
         // int32 quest_level = (_level == -1 ? player->GetLevel() : _level);
         // 所有任务基于当前玩家等级计算经验
         int32 quest_level = (_level == -1 ? player->GetLevel() : std::max(player->GetLevel(), uint8(_level)));
+        // @enlight-end
 
         QuestXPEntry const* xpentry = sQuestXPStore.LookupEntry(quest_level);
         if (!xpentry)
@@ -385,6 +387,7 @@ bool Quest::CanIncreaseRewardedQuestCounters() const
     return (!IsDFQuest() && !IsDaily() && (!IsRepeatable() || IsWeekly() || IsMonthly() || IsSeasonal()));
 }
 
+// @enlight-begin
 void Quest::AddQuestRewardItem(uint32 itemId, uint32 count, bool isChoiceReward){
     if (isChoiceReward){
         if (_rewChoiceItemsCount >= QUEST_REWARD_CHOICES_COUNT)
@@ -398,9 +401,10 @@ void Quest::AddQuestRewardItem(uint32 itemId, uint32 count, bool isChoiceReward)
         RewardItemId[_rewItemsCount] = itemId;
         RewardItemIdCount[_rewItemsCount] = count;
         ++_rewItemsCount;
-        LOG_INFO("esp.quest_boost", "_rewItemsCount is {} for quest {}", _rewItemsCount, Id);
+        TC_LOG_INFO("esp.quest_boost", "_rewItemsCount is {} for quest {}", _rewItemsCount, itemId);
     }
 }
+// @enlight-end
 
 void Quest::InitializeQueryData()
 {

@@ -15380,6 +15380,7 @@ void Player::IncompleteQuest(uint32 quest_id)
     }
 }
 
+// @enlight-begin
 void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce)
 {
     // 获取任务ID
@@ -15387,7 +15388,7 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
     
     // 获取调整后的任务模板（可能为空）
     Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(
-        questId, GetLevel(), GetClass(), GetMostPointsTalentTree());
+        questId, GetLevel(), GetClass(), GetMainTalentIndex());
     
     // 决定最终使用的任务指针
     Quest const* questToUse = adjustedQuest ? adjustedQuest : quest;
@@ -15398,6 +15399,7 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
 
 void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce, bool adjusted)
 {
+// @enlight-end
     //this THING should be here to protect code from quest, which cast on player far teleport as a reward
     //should work fine, cause far teleport will be executed in Player::Update()
     SetCanDelayTeleport(true);
@@ -26677,6 +26679,17 @@ void Player::LoadActions(PreparedQueryResult result)
 
     SendActionButtons(1);
 }
+
+// @enlight-begin
+uint8 Player::GetMainTalentIndex()
+{
+    uint8 maxIndex = 0;
+    for (uint8 i = 1; i < 3; ++i)
+        if (GetTalentPointsInTree(i) > GetTalentPointsInTree(maxIndex))
+            maxIndex = i;
+    return maxIndex;
+}
+// @enlight-end
 
 void Player::SetReputation(uint32 factionentry, uint32 value)
 {

@@ -36,10 +36,13 @@
 #include "TemporarySummon.h"
 #include "Vehicle.h"
 #include "World.h"
+// @enlight-begin
 #include <vector>
 #include <algorithm>
 #include <numeric>
 #include "GameTime.h" // 确保包含 GameTime 头文件
+#include "GridNotifiersImpl.h"
+// @enlight-end
 
 AISpellInfoType* UnitAI::AISpellInfo;
 AISpellInfoType* GetAISpellInfo(uint32 i) { return &UnitAI::AISpellInfo[i]; }
@@ -129,14 +132,16 @@ void CreatureAI::MoveInLineOfSight_Safe(Unit* who)
     _moveInLOSLocked = false;
 }
 
+// @enlight-begin
 uint32 CreatureAI::MaxLevelOfNearByPlayers(float radius)
 {
     std::vector<uint32> playerLevels;
 
     // 遍历附近的玩家，记录所有玩家的等级
     std::list<Player*> players;
-    Acore::AnyPlayerInObjectRangeCheck checker(me, radius);
-    Acore::PlayerListSearcher<Acore::AnyPlayerInObjectRangeCheck> searcher(me, players, checker);
+    Trinity::AnyPlayerInObjectRangeCheck checker(me, radius);
+    Trinity::PlayerListSearcher<Trinity::AnyPlayerInObjectRangeCheck> searcher(me, players, checker);
+
     Cell::VisitWorldObjects(me, searcher, radius);
 
     for (Player* player : players)
@@ -213,7 +218,7 @@ void CreatureAI::LevelUpTo(int8 highestNearbyPlayerLevel)
     int8 ownerLevel = 0;
     if (me->GetOwner() && (ownerLevel = me->GetOwner()->GetLevel())){
         if (ownerLevel != creatureCurrentLevel){
-            LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to owner level {} from {}", me->GetSpawnId(), me->GetEntry(), ownerLevel, creatureCurrentLevel);
+            TC_LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to owner level {} from {}", me->GetSpawnId(), me->GetEntry(), ownerLevel, creatureCurrentLevel);
             me->SelectLevel(true, ownerLevel, ownerLevel); 
         }
         return;
@@ -222,7 +227,7 @@ void CreatureAI::LevelUpTo(int8 highestNearbyPlayerLevel)
     // 玩家等级在5级以下，恢复野怪等级至默认
     if (highestNearbyPlayerLevel <= 5) {
         if (creatureCurrentLevel < minDefaultLevel || creatureCurrentLevel > maxDefaultLevel) {
-            LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to default level {}-{} from {}", me->GetSpawnId(), me->GetEntry(), minDefaultLevel, maxDefaultLevel, creatureCurrentLevel);
+            TC_LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to default level {}-{} from {}", me->GetSpawnId(), me->GetEntry(), minDefaultLevel, maxDefaultLevel, creatureCurrentLevel);
             me->SelectLevel(true, minDefaultLevel, maxDefaultLevel);
         }
         return;
@@ -236,7 +241,7 @@ void CreatureAI::LevelUpTo(int8 highestNearbyPlayerLevel)
     // 玩家等级小于野怪等级3级以上，野怪调整至默认等级
     if (highestNearbyPlayerLevel < creatureCurrentLevel - 2) {
         if (creatureCurrentLevel < minDefaultLevel || creatureCurrentLevel > maxDefaultLevel) {
-            LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to default level {}-{} from {}", me->GetSpawnId(), me->GetEntry(), minDefaultLevel, maxDefaultLevel, creatureCurrentLevel);
+            TC_LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to default level {}-{} from {}", me->GetSpawnId(), me->GetEntry(), minDefaultLevel, maxDefaultLevel, creatureCurrentLevel);
             me->SelectLevel(true, minDefaultLevel, maxDefaultLevel);
         }
         return;
@@ -246,7 +251,7 @@ void CreatureAI::LevelUpTo(int8 highestNearbyPlayerLevel)
     if (highestNearbyPlayerLevel > creatureCurrentLevel + 2) {
         int8 newLevel = highestNearbyPlayerLevel - 2 + rand() % 5; // 在玩家等级-3到+3范围内随机调整
         newLevel = std::max(newLevel, int8(creatureCurrentLevel + 1)); // 确保新等级高于当前等级
-        LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to higher level {} from {}", me->GetSpawnId(), me->GetEntry(), newLevel, creatureCurrentLevel);
+        TC_LOG_INFO("RSAI", "Creature {} [entry {}] is leveling to higher level {} from {}", me->GetSpawnId(), me->GetEntry(), newLevel, creatureCurrentLevel);
         me->SelectLevel(true, newLevel, newLevel);
         return;
     }
@@ -257,7 +262,7 @@ void CreatureAI::MoveInLineOfSight(Unit* who)
     if (me->IsEngaged())
         return;
 
-    time_t curTime = GameTime::GetGameTime().count(); // 获取当前时间
+    time_t curTime = GameTime::GetGameTime(); // 获取当前时间
 
     // 检查时间间隔是否超过1秒
     if (curTime - lastLevelUpTime >= 1) {
@@ -269,6 +274,7 @@ void CreatureAI::MoveInLineOfSight(Unit* who)
     if (me->HasReactState(REACT_AGGRESSIVE) && me->CanStartAttack(who, false))
         me->EngageWithTarget(who);
 }
+// @enlight-end
 
 void CreatureAI::OnOwnerCombatInteraction(Unit* target)
 {

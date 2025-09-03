@@ -400,7 +400,8 @@ void PlayerMenu::SendQuestGiverQuestDetails(Quest const* quest, ObjectGuid npcGU
     WorldPackets::Quest::QuestGiverQuestDetails packet;
 
     uint32 questId = quest->GetQuestId();
-    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMostPointsTalentTree());
+    // @enlight-begin
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMainTalentIndex());
 
     packet.Title = quest->GetTitle();
     packet.Details = quest->GetDetails();
@@ -439,7 +440,7 @@ void PlayerMenu::SendQuestGiverQuestDetails(Quest const* quest, ObjectGuid npcGU
 void PlayerMenu::SendQuestQueryResponse(Quest const* quest) const
 {
     uint32 questId = quest->GetQuestId();
-    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMostPointsTalentTree());
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMainTalentIndex());
 
     if (sWorld->getBoolConfig(CONFIG_CACHE_DATA_QUERIES))
         _session->SendPacket(&quest->QueryData[static_cast<uint32>(_session->GetSessionDbLocaleIndex())]);
@@ -458,7 +459,7 @@ void PlayerMenu::SendQuestGiverOfferReward(Quest const* quest, ObjectGuid npcGUI
     WorldPackets::Quest::QuestGiverOfferRewardMessage packet;
 
     uint32 questId = quest->GetQuestId();
-    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMostPointsTalentTree());
+    Quest const* adjustedQuest = sObjectMgr->GetQuestTemplateByPlayerLevelAndClass(questId, _session->GetPlayer()->GetLevel(), _session->GetPlayer()->GetClass(), _session->GetPlayer()->GetMainTalentIndex());
 
     packet.Title = quest->GetTitle();
     packet.RewardText = quest->GetOfferRewardText();
@@ -482,8 +483,10 @@ void PlayerMenu::SendQuestGiverOfferReward(Quest const* quest, ObjectGuid npcGUI
     for (uint32 i = 0; i < QUEST_EMOTE_COUNT && quest->OfferRewardEmote[i]; ++i)
         packet.Emotes.emplace_back(quest->OfferRewardEmote[i], quest->OfferRewardEmoteDelay[i]);
 
+    // @enlight-begin
     // quest->BuildQuestRewards(packet.Rewards, _session->GetPlayer(), true);
     adjustedQuest->BuildQuestRewards(packet.Rewards, _session->GetPlayer(), true);
+    // @enlight-end
 
     _session->SendPacket(packet.Write());
 

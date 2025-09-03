@@ -453,7 +453,10 @@ void SmartAI::MoveInLineOfSight(Unit* who)
 {
     if (!who)
         return;
-    CreatureAI::MoveInLineOfSight(who);
+
+    // enlight-begin
+    // CreatureAI::MoveInLineOfSight(who);
+    // enlight-end
 
     GetScript()->OnMoveInLineOfSight(who);
 

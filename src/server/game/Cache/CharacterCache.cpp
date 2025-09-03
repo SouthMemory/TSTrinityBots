@@ -257,6 +257,7 @@ uint8 CharacterCache::GetCharacterLevelByGuid(ObjectGuid guid) const
     return itr->second.Level;
 }
 
+// @enlight-begin
 uint8 CharacterCache::GetCharacterClassByGuid(ObjectGuid guid) const
 {
     auto itr = _characterCacheStore.find(guid);
@@ -267,6 +268,7 @@ uint8 CharacterCache::GetCharacterClassByGuid(ObjectGuid guid) const
 
     return itr->second.Class;
 }
+// @enlight-end
 
 ObjectGuid::LowType CharacterCache::GetCharacterGuildIdByGuid(ObjectGuid guid) const
 {

@@ -253,16 +253,18 @@ class TC_GAME_API CreatureAI : public UnitAI
     protected:
         void EngagementStart(Unit* who);
         void EngagementOver();
+        // @enlight-begin
         virtual void MoveInLineOfSight(Unit* /*who*/);
         uint32 MaxLevelOfNearByPlayers(float radius = 100.0f);
+        time_t lastLevelUpTime = 0; // 记录上次调整等级的时间
+        // @enlight-end
         void LevelUpTo(int8 newLevel);
 
         bool _EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER);
 
         CreatureBoundary const* _boundary;
-        bool _negateBoundary;
-        time_t lastLevelUpTime = 0; // 记录上次调整等级的时间
-
+        bool _negateBoundary;      
+        
     private:
         void OnOwnerCombatInteraction(Unit* target);
 

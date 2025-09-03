@@ -1685,6 +1685,7 @@ class TC_GAME_API SmartAIMgr
 
         static SmartScriptHolder& FindLinkedEvent(SmartAIEventList& list, uint32 link);
 
+        // enlight-begin
         std::vector<uint32> GetCreatureSmartAISpells(int32 entry)
         {
 
@@ -1723,6 +1724,7 @@ class TC_GAME_API SmartAIMgr
 
             return spellList;
         }
+        // enlight-end
 
     private:
         //event stores

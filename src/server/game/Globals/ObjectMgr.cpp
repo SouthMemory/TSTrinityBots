@@ -65,6 +65,7 @@
 ScriptMapMap sSpellScripts;
 ScriptMapMap sEventScripts;
 ScriptMapMap sWaypointScripts;
+std::unordered_map<uint32_t, std::unordered_map<uint64_t, uint32_t>> ObjectMgr::LoadedBoostData;
 
 std::string GetScriptsTableNameByType(ScriptsType type)
 {
@@ -5308,13 +5309,14 @@ void ObjectMgr::GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, Play
     else
         BuildPlayerLevelInfo(race, class_, level, info);
 
-    GtChanceToMeleeCritEntry     const* critRatio = sGtChanceToMeleeCritStore.LookupEntry(level-1);
-    GtChanceToMeleeCritEntry     const* critRatio_80 = sGtChanceToMeleeCritStore.LookupEntry(79);
+    // @enlight-begin
+    GtChanceToMeleeCritEntry const* critRatio = sGtChanceToMeleeCritStore.LookupEntry(level-1);
+    GtChanceToMeleeCritEntry const* critRatio_80 = sGtChanceToMeleeCritStore.LookupEntry(79);
 
-    float stats_level_multiplier = critRatio_80->ratio / critRatio->ratio;
+    float stats_level_multiplier = critRatio_80->Data / critRatio->Data;
 
     if (level == 1 || level == 80){
-        LOG_DEBUG("esp.GetPlayerLevelInfo", "critRatio->rator {}, critRatio_80->ratio {}, stats_level_multiplier {}", critRatio->ratio, critRatio_80->ratio, stats_level_multiplier);
+        TC_LOG_DEBUG("esp.GetPlayerLevelInfo", "critRatio->rator {}, critRatio_80->ratio {}, stats_level_multiplier {}", critRatio->Data, critRatio_80->Data, stats_level_multiplier);
     }
 
     // 对基础属性进行额外加成
@@ -5323,6 +5325,7 @@ void ObjectMgr::GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, Play
     info->stats[STAT_STAMINA] += 5 * level * stats_level_multiplier;
     info->stats[STAT_INTELLECT] += 5 * level * stats_level_multiplier;
     info->stats[STAT_SPIRIT] += 5 * level * stats_level_multiplier;
+    // @enlight-end
 }
 
 void ObjectMgr::BuildPlayerLevelInfo(uint8 race, uint8 _class, uint8 level, PlayerLevelInfo* info) const
@@ -5459,6 +5462,25 @@ void ObjectMgr::LoadQuests()
         auto itr = _questTemplates.emplace(std::piecewise_construct, std::forward_as_tuple(questId), std::forward_as_tuple(new Quest(fields))).first;
         itr->second->_weakRef = itr->second;
     } while (result->NextRow());
+
+    // pussywizard:
+    {
+        uint32 max = 0;
+        // 使用 QuestContainer 的迭代器
+        for (QuestContainer::const_iterator itr = _questTemplates.begin(); itr != _questTemplates.end(); ++itr)
+            if (itr->first > max)
+                max = itr->first;
+        
+        if (max)
+        {
+            _questTemplatesFast.clear();
+            _questTemplatesFast.resize(max + 1, nullptr);
+            
+            // 同样修复这里的迭代器
+            for (QuestContainer::iterator itr = _questTemplates.begin(); itr != _questTemplates.end(); ++itr)
+                _questTemplatesFast[itr->first] = itr->second.get(); // 使用 get() 获取原始指针
+        }
+    }
 
     std::unordered_map<uint32, uint32> usedMailTemplates;
 
@@ -6236,7 +6258,7 @@ void ObjectMgr::LoadQuestRewardItemBoostData()
 
     if (!result)
     {
-        LOG_INFO("sql.sql", "No records to load from quest_reward_item_boost table.");
+        TC_LOG_INFO("sql.sql", "No records to load from quest_reward_item_boost table.");
         return;
     }
 
@@ -6256,23 +6278,24 @@ void ObjectMgr::LoadQuestRewardItemBoostData()
         LoadedBoostData[originalItemEntry][key] = boostedItemEntry;
     } while (result->NextRow());
 
-    LOG_INFO("server.loading", "Loaded {} quest reward item boost records.", result->GetRowCount());
+    TC_LOG_INFO("server.loading", "Loaded {} quest reward item boost records.", result->GetRowCount());
 }
 
 void ObjectMgr::SaveQuestRewardItemBoostData(uint32_t originalItemEntry, uint32_t playerLevel, uint32_t playerClass, uint8_t playerSpec, uint32_t boostedItemEntry)
 {
     // 保存到数据库
-    WorldDatabase.Execute(
+    std::string sql = fmt::format(
         "REPLACE INTO quest_reward_item_boost (original_item_entry, player_level, player_class, player_spec, boosted_item_entry) "
         "VALUES ({}, {}, {}, {}, {})",
         originalItemEntry, playerLevel, playerClass, playerSpec, boostedItemEntry
     );
+    WorldDatabase.Execute(sql.c_str());
 
     // 同时更新内存中的数据
     uint64_t key = (static_cast<uint64_t>(playerLevel) << 16) | (playerClass << 8) | playerSpec;
     LoadedBoostData[originalItemEntry][key] = boostedItemEntry;
 
-    LOG_INFO("sql.sql", "Saved boosted item data: originalItemEntry={}, playerLevel={}, playerClass={}, playerSpec={}, boostedItemEntry={}", 
+    TC_LOG_INFO("sql.sql", "Saved boosted item data: originalItemEntry={}, playerLevel={}, playerClass={}, playerSpec={}, boostedItemEntry={}", 
              originalItemEntry, playerLevel, playerClass, playerSpec, boostedItemEntry);
 }
 
@@ -6384,12 +6407,6 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
     if (!originalQuest) {
         return nullptr;
     }
-    if (originalQuest->Title == "Awakener Purge - The Ultimate Weapon@Lev60" ||
-        originalQuest->Title == "Awakener Purge - The Ultimate Weapon@Lev70" ||
-        originalQuest->Title == "Awakener Purge - The Ultimate Weapon@Lev80")
-    {
-        return originalQuest;
-    }
 
     player_level = int8(player_level);
 
@@ -6400,7 +6417,7 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
 
     EquipPhyOrSpell equipTypePreferred = PlayerPhysicalOrMagicEquipNeeded(player_level, player_class, player_spec);
 
-    LOG_ERROR("esp.ObjectMgr", "Player level: {}, class: {}, spec: {}, equip type: {}", player_level, player_class, player_spec, equipTypePreferred == EQUIP_PHY ? "physical" : equipTypePreferred == EQUIP_SPE ? "spell" : "unknown");
+    TC_LOG_ERROR("esp.ObjectMgr", "Player level: {}, class: {}, spec: {}, equip type: {}", player_level, player_class, player_spec, equipTypePreferred == EQUIP_PHY ? "physical" : equipTypePreferred == EQUIP_SPE ? "spell" : "unknown");
 
     // 复制Quest对象
     Quest* modifiedQuest = new Quest(*originalQuest);
@@ -6423,7 +6440,7 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
                 // 如果在缓存中找到，则直接使用
                 newItemIdsArray[i] = playerBoostIt->second;
                 selectedEntries.push_back(newItemIdsArray[i]);
-                LOG_INFO("esp.quest_boost", "Quest {}'s reward item {} boosted to {} with cache", quest_id, oldItemId, newItemIdsArray[i]);
+                TC_LOG_INFO("esp.quest_boost", "Quest {}'s reward item {} boosted to {} with cache", quest_id, oldItemId, newItemIdsArray[i]);
                 return true;
             }
         }
@@ -6491,7 +6508,7 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
 
         if (!result)
         {
-            LOG_INFO("esp.quest_boost", "No suitable items queried for quest {}: {}", quest_id, query.c_str());
+            TC_LOG_INFO("esp.quest_boost", "No suitable items queried for quest {}: {}", quest_id, query.c_str());
             return false;
         }
 
@@ -6507,10 +6524,10 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
         do
         {
             Field* fields = result->Fetch();
-            uint32 entry = fields[0].Get<uint32>();
-            uint32 quality = uint32(fields[1].Get<uint8>());
-            uint32 itemLevel = uint32(fields[2].Get<uint16>());
-            uint32 requiredLevel = uint32(fields[3].Get<uint8>());
+            uint32 entry = fields[0].GetUInt32();
+            uint32 quality = uint32(fields[1].GetUInt8());
+            uint32 itemLevel = uint32(fields[2].GetUInt16());
+            uint32 requiredLevel = uint32(fields[3].GetUInt8());
 
             // 额外的过滤条件
             if (quality == 4 && (
@@ -6543,7 +6560,7 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
         // 现在 items 包含了合并后的结果
         if (items.empty())
         {
-            LOG_INFO("esp.quest_boost", "No suitable items filtered for quest {}", quest_id);
+            TC_LOG_INFO("esp.quest_boost", "No suitable items filtered for quest {}", quest_id);
             return false;
         }
 
@@ -6585,14 +6602,14 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
 
         if (!selectedEntry)
         {
-            LOG_INFO("esp.quest_boost", "No boosting item available for quest {}'s reward {}", quest_id, oldItemId);
+            TC_LOG_INFO("esp.quest_boost", "No boosting item available for quest {}'s reward {}", quest_id, oldItemId);
             return false;
         }
 
         newItemIdsArray[i] = selectedEntry;
         selectedEntries.push_back(selectedEntry);
         SaveQuestRewardItemBoostData(oldItemId, player_level, player_class, player_spec, selectedEntry);
-        LOG_INFO("esp.quest_boost", "quest {}'s reward item {} boosted to {} for player class {} @Lev{}", quest_id, oldItemId, selectedEntry, player_class, player_level);
+        TC_LOG_INFO("esp.quest_boost", "quest {}'s reward item {} boosted to {} for player class {} @Lev{}", quest_id, oldItemId, selectedEntry, player_class, player_level);
         return true;
     };
 
@@ -6663,11 +6680,11 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
 
     // log all RewardChoiceItemId
     for (uint32 i = 0; i < QUEST_REWARD_CHOICES_COUNT; ++i){
-        LOG_INFO("esp.quest_boost", "Final ItemId 【choice】 for quest {}: {}", quest_id, modifiedQuest->RewardChoiceItemId[i]);
+        TC_LOG_INFO("esp.quest_boost", "Final ItemId 【choice】 for quest {}: {}", quest_id, modifiedQuest->RewardChoiceItemId[i]);
     }
 
     for (uint32 i = 0; i < QUEST_REWARDS_COUNT; ++i){
-        LOG_INFO("esp.quest_boost", "Final ItemId 【no choice】for quest {}: {}", quest_id, modifiedQuest->RewardItemId[i]);
+        TC_LOG_INFO("esp.quest_boost", "Final ItemId 【no choice】for quest {}: {}", quest_id, modifiedQuest->RewardItemId[i]);
     }
 
     modifiedQuest->InitializeQueryData();

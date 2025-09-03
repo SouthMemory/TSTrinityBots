@@ -1527,6 +1527,20 @@ void Creature::SelectLevel()
     SetLevel(level);
 }
 
+// @enlight-begin
+void Creature::SelectLevel(bool changelevel, uint8 minLevel, uint8 maxLevel)
+{
+    CreatureTemplate const* cInfo = GetCreatureTemplate();
+    
+    minLevel = (minLevel == 0) ? std::min(cInfo->minlevel, cInfo->maxlevel) : minLevel;
+    maxLevel = (maxLevel == 0) ? std::max(cInfo->minlevel, cInfo->maxlevel) : maxLevel;
+    uint8 level = (minLevel == maxLevel) ? minLevel : urand(minLevel, maxLevel);
+
+    if (changelevel)
+        SetLevel(level);
+}
+// @enlight-end
+
 void Creature::UpdateLevelDependantStats()
 {
     CreatureTemplate const* cInfo = GetCreatureTemplate();

@@ -330,7 +330,9 @@ class TC_GAME_API Quest
         uint32 GetRewChoiceItemsCount() const { return _rewChoiceItemsCount; }
         uint32 GetRewItemsCount() const { return _rewItemsCount; }
 
+        // @enlight-begin
         void AddQuestRewardItem(uint32 itemId, uint32 count = 0, bool isChoiceReward = false);
+        // @enlight-end
 
         void SetEventIdForQuest(uint16 eventId) { _eventIdForQuest = eventId; }
         uint16 GetEventIdForQuest() const { return _eventIdForQuest; }

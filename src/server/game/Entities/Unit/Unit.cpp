@@ -9459,6 +9459,8 @@ bool Unit::CanFreeMove() const
 void Unit::SetLevel(uint8 lvl, bool sendUpdate/* = true*/)
 {
     SetUInt32Value(UNIT_FIELD_LEVEL, lvl);
+    if (m_default_level == 1)
+        m_default_level = lvl;
 
     if (!sendUpdate)
         return;

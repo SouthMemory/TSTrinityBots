@@ -884,6 +884,8 @@ class TC_GAME_API Unit : public WorldObject
         bool IsTotem() const    { return (m_unitTypeMask & UNIT_MASK_TOTEM) != 0; }
         bool IsVehicle() const  { return (m_unitTypeMask & UNIT_MASK_VEHICLE) != 0; }
 
+        [[nodiscard]] uint8 getDefaultLevel() const {return m_default_level;}
+
         uint8 GetLevel() const { return uint8(GetUInt32Value(UNIT_FIELD_LEVEL)); }
         uint8 GetLevelForTarget(WorldObject const* /*target*/) const override { return GetLevel(); }
         void SetLevel(uint8 lvl, bool sendUpdate = true);
@@ -1846,6 +1848,8 @@ class TC_GAME_API Unit : public WorldObject
         void _UpdateAutoRepeatSpell();
 
         bool m_ControlledByPlayer;
+
+        uint8 m_default_level = 1;
 
         bool m_AutoRepeatFirstCast;
 

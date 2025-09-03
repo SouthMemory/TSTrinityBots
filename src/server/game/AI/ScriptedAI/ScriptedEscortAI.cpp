@@ -314,10 +314,13 @@ void EscortAI::Start(bool isActiveAttacker /* = true*/, bool run /* = false */, 
     _instantRespawn = instantRespawn;
     _returnToStart = canLoopPath;
 
+
+    // enlight-begin
     // 被护送的NPC，等级动态，并比玩家等级至少高5级，避免太容易死
     Player* player = GetPlayerForEscort();
     if (player && me->GetLevel() <= player->GetLevel() + 5)
         me->SelectLevel(true, player->GetLevel() + 5, player->GetLevel() + 8);
+    // enlight-end
 
     if (_returnToStart && _instantRespawn)
         TC_LOG_ERROR("scripts.ai.escortai", "EscortAI::Start: (script: {}) is set to return home after waypoint end and instant respawn at waypoint end. Creature will never despawn ({})", me->GetScriptName(), me->GetGUID().ToString());

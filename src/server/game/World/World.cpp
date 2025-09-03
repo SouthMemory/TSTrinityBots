@@ -94,6 +94,7 @@
 #include "WeatherMgr.h"
 #include "WhoListStorage.h"
 #include "WorldSession.h"
+#include "Errors.h"
 
 #include <boost/asio/ip/address.hpp>
 
@@ -1792,8 +1793,10 @@ void World::SetInitialWorldSettings()
     sObjectMgr->LoadCustomItemTemplates();
     // @tswow-end
 
-    LOG_INFO("server.loading", "Loading Quest Reward Item Boost Data...");
+    // @enlight-begin
+    TC_LOG_INFO("server.loading", "Loading Quest Reward Item Boost Data...");
     sObjectMgr->LoadQuestRewardItemBoostData();
+    // @enlight-end
 
     TC_LOG_INFO("server.loading", "Loading Item set names...");                // must be after LoadItemPrototypes
     sObjectMgr->LoadItemSetNames();
