@@ -1649,6 +1649,7 @@ void Creature::UpdateLevelDependantStats()
     );
     // @tswow-end
     SetStatFlatModifier(UNIT_MOD_ARMOR, BASE_VALUE, armor);
+    UpdateAllStats();
 }
 
 float Creature::_GetHealthMod(int32 Rank)

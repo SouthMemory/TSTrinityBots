@@ -410,6 +410,7 @@ struct TC_GAME_API CreatureBaseStats
 
     uint32 GenerateHealth(CreatureTemplate const* info) const
     {
+        uint32 expansion = info->minlevel >= 61 ? 2 : info->expansion;
         return uint32(ceil(BaseHealth[info->expansion] * info->ModHealth));
     }
 
