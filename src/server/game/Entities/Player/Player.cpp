@@ -15440,12 +15440,17 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
                 {
                     Item* item = StoreNewItem(dest, itemId, true, GenerateItemRandomPropertyId(itemId));
                     SendNewItem(item, quest->RewardItemIdCount[i], true, false, false, false);
+                    sScriptMgr->OnQuestRewardItem(this, item, quest->RewardChoiceItemCount[reward]);
+                    // sScriptMgr->OnQuestRewardItem(this, item, adjustedQuest->RewardChoiceItemCount[reward], quest->GetQuestLevel()==-1 ? GetLevel() : quest->GetQuestLevel());
+
                 }
                 else if (quest->IsDFQuest())
                     SendItemRetrievalMail(itemId, quest->RewardItemIdCount[i]);
             }
         }
     }
+
+    std::cout << "quest->GetRewChoiceItemsCount() = " << quest->GetRewChoiceItemsCount() << std::endl;
 
     if (quest->GetRewChoiceItemsCount() > 0)
     {
@@ -15456,6 +15461,10 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
             {
                 Item* item = StoreNewItem(dest, itemId, true, GenerateItemRandomPropertyId(itemId));
                 SendNewItem(item, quest->RewardChoiceItemCount[reward], true, false, false, false);
+
+                std::cout << "quest->RewardChoiceItemCount[reward] = " << quest->RewardChoiceItemCount[reward] << std::endl;
+                sScriptMgr->OnQuestRewardItem(this, item, quest->RewardItemIdCount[reward]);
+                // sScriptMgr->OnQuestRewardItem(this, item, adjustedQuest->RewardItemIdCount[i], adjustedQuest->GetQuestLevel()==-1 ? GetLevel() : adjustedQuest->GetQuestLevel());
             }
         }
     }

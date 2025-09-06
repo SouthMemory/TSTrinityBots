@@ -2078,6 +2078,37 @@ void ScriptMgr::OnMovieComplete(Player* player, uint32 movieId)
     FOREACH_SCRIPT(PlayerScript)->OnMovieComplete(player, movieId);
 }
 
+void ScriptMgr::OnLootItem(Player* player, Item* item, uint32 count, ObjectGuid lootguid)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnLootItem(player, item, count, lootguid);
+}
+
+void ScriptMgr::OnQuestRewardItem(Player* player, Item* item, uint32 count)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnQuestRewardItem(player, item, count);
+}
+
+void ScriptMgr::OnCreateItem(Player* player, Item* item, uint32 count)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnCreateItem(player, item, count);
+}
+
+void ScriptMgr::OnGroupRollRewardItem(Player* player, Item* item, uint32 count, RollVote voteType, Roll* roll)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnGroupRollRewardItem(player, item, count, voteType, roll);
+}
+
+bool ScriptMgr::CanCastItemUseSpell(Player* player, Item* item, SpellCastTargets const& targets, uint8 cast_count, uint32 glyphIndex)
+{
+    return true;
+}
+
+void ScriptMgr::OnAfterStoreOrEquipNewItem(Player* player, uint32 vendorslot, Item* item, uint8 count, uint8 bag, uint8 slot, ItemTemplate const* pProto, Creature* pVendor, VendorItem const* crItem, bool bStore)
+{
+    FOREACH_SCRIPT(PlayerScript)->OnAfterStoreOrEquipNewItem(player, vendorslot, item, count, bag, slot, pProto, pVendor, crItem, bStore);
+}
+
+
 // Account
 void ScriptMgr::OnAccountLogin(uint32 accountId)
 {
@@ -2797,6 +2828,32 @@ void PlayerScript::OnPlayerRepop(Player* /*player*/)
 void PlayerScript::OnMovieComplete(Player* /*player*/, uint32 /*movieId*/)
 {
 }
+
+void PlayerScript::OnLootItem(Player* /*player*/, Item* /*item*/, uint32 /*count*/, ObjectGuid /*lootguid*/)
+{
+}
+
+void PlayerScript::OnQuestRewardItem(Player* player, Item* item, uint32 /*count*/)
+{
+
+}
+void PlayerScript::OnCreateItem(Player* player, Item* item, uint32 /*count*/)
+{
+
+}
+void PlayerScript::OnGroupRollRewardItem(Player* player, Item* item, uint32 /*count*/, RollVote /*voteType*/, Roll* /*roll*/)
+{
+
+}
+bool PlayerScript::CanCastItemUseSpell(Player* /*player*/, Item* /*item*/, SpellCastTargets const& /*targets*/, uint8 /*cast_count*/, uint32 /*glyphIndex*/)
+{
+    return true;
+}
+void PlayerScript::OnAfterStoreOrEquipNewItem(Player* player, uint32 /*vendorslot*/, Item* item, uint8 /*count*/, uint8 /*bag*/, uint8 /*slot*/, ItemTemplate const* pProto, Creature* pVendor, VendorItem const* crItem, bool /*bStore*/)
+{
+
+}
+
 
 AccountScript::AccountScript(char const* name)
     : ScriptObject(name)

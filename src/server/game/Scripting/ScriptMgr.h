@@ -24,6 +24,7 @@
 #include "Types.h"
 #include <memory>
 #include <vector>
+#include "CreatureData.h"
 
 class AccountMgr;
 class AuctionHouseObject;
@@ -62,6 +63,7 @@ class WorldPacket;
 class WorldSocket;
 class WorldObject;
 class WorldSession;
+class Roll;
 
 struct AchievementCriteriaData;
 struct AreaTriggerEntry;
@@ -88,6 +90,7 @@ enum ShutdownMask : uint32;
 enum SpellEffIndex : uint8;
 enum WeatherState : uint32;
 enum XPColorChar : uint8;
+enum RollVote : uint8;
 
 #define VISIBLE_RANGE       166.0f                          //MAX visible range (size of grid)
 
@@ -738,6 +741,23 @@ class TC_GAME_API PlayerScript : public ScriptObject
         // Called when a player completes a movie
         virtual void OnMovieComplete(Player* player, uint32 movieId);
 
+        // Called when a player loots an item
+        virtual void OnLootItem(Player* player, Item* item, uint32 /*count*/, ObjectGuid /*lootguid*/);
+
+        // Called when a player get an item from a quest
+        virtual void OnQuestRewardItem(Player* player, Item* item, uint32 /*count*/);
+
+        // Called when a player create  an item
+        virtual void OnCreateItem(Player* player, Item* item, uint32 /*count*/);
+
+        // Called when a player rolls a reward item
+        virtual void OnGroupRollRewardItem(Player* player, Item* item, uint32 /*count*/, RollVote /*voteType*/, Roll* /*roll*/);
+        
+        // Called when a player uses an item
+        virtual bool CanCastItemUseSpell(Player* /*player*/, Item* /*item*/, SpellCastTargets const& /*targets*/, uint8 /*cast_count*/, uint32 /*glyphIndex*/);
+        
+        // Called when a player stores or equips an item
+        virtual void OnAfterStoreOrEquipNewItem(Player* player, uint32 vendorslot, Item* item, uint8 count, uint8 bag, uint8 slot, ItemTemplate const* pProto, Creature* pVendor, VendorItem const* crItem, bool bStore);
 };
 
 class TC_GAME_API AccountScript : public ScriptObject
@@ -1061,6 +1081,12 @@ class TC_GAME_API ScriptMgr
         void OnQuestStatusChange(Player* player, uint32 questId);
         void OnMovieComplete(Player* player, uint32 movieId);
         void OnPlayerRepop(Player* player);
+        void OnLootItem(Player* player, Item* item, uint32 count, ObjectGuid lootguid);
+        void OnQuestRewardItem(Player* player, Item* item, uint32 count);
+        void OnCreateItem(Player* player, Item* item, uint32 count);
+        void OnGroupRollRewardItem(Player* player, Item* item, uint32 count, RollVote voteType, Roll* roll);
+        bool CanCastItemUseSpell(Player* player, Item* item, SpellCastTargets const& targets, uint8 cast_count, uint32 glyphIndex);
+        void OnAfterStoreOrEquipNewItem(Player* player, uint32 vendorslot, Item* item, uint8 count, uint8 bag, uint8 slot, ItemTemplate const* pProto, Creature* pVendor, VendorItem const* crItem, bool bStore);
 
     public: /* AccountScript */
 

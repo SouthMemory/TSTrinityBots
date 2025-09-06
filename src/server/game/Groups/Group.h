@@ -46,7 +46,7 @@ struct MapEntry;
 
 #define TARGET_ICONS_COUNT  8
 
-enum RollVote
+enum RollVote : uint8
 {
     PASS              = 0,
     NEED              = 1,
