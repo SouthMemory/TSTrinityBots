@@ -662,7 +662,7 @@ struct PlayerClassInfo
 
 struct PlayerLevelInfo
 {
-    uint8 stats[MAX_STATS] = { };
+    uint32 stats[MAX_STATS] = { };
 };
 
 typedef std::vector<uint32> PlayerCreateInfoSpells;

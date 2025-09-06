@@ -4738,7 +4738,7 @@ void ObjectMgr::LoadPlayerInfo()
 
                 PlayerLevelInfo& levelInfo = info->levelInfo[current_level - 1];
                 for (uint8 i = 0; i < MAX_STATS; ++i)
-                    levelInfo.stats[i] = fields[i + 3].GetUInt8();
+                    levelInfo.stats[i] = fields[i + 3].GetUInt32();
             }
 
             ++count;
@@ -5315,9 +5315,14 @@ void ObjectMgr::GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, Play
 
     float stats_level_multiplier = critRatio_80->Data / critRatio->Data;
 
-    if (level == 1 || level == 80){
-        TC_LOG_DEBUG("esp.GetPlayerLevelInfo", "critRatio->rator {}, critRatio_80->ratio {}, stats_level_multiplier {}", critRatio->Data, critRatio_80->Data, stats_level_multiplier);
-    }
+
+    // std::cout << "critRatio->rator " << critRatio->Data << std::endl;
+    // std::cout << "critRatio_80->ratio " << critRatio_80->Data << std::endl;
+    // std::cout << "stats_level_multiplier " << stats_level_multiplier << std::endl;
+
+    // if (level == 1 || level == 80){
+    //     TC_LOG_ERROR("module", "critRatio->rator {}, critRatio_80->ratio {}, stats_level_multiplier {}", critRatio->Data, critRatio_80->Data, stats_level_multiplier);
+    // }
 
     // 对基础属性进行额外加成
     info->stats[STAT_STRENGTH] += 5 * level * stats_level_multiplier;
