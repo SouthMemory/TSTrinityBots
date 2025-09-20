@@ -61,6 +61,7 @@
 #include "Vehicle.h"
 #include "World.h"
 #include "DBCStores.h"
+#include <random>
 
 ScriptMapMap sSpellScripts;
 ScriptMapMap sEventScripts;
@@ -6422,7 +6423,7 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
 
     EquipPhyOrSpell equipTypePreferred = PlayerPhysicalOrMagicEquipNeeded(player_level, player_class, player_spec);
 
-    TC_LOG_ERROR("esp.ObjectMgr", "Player level: {}, class: {}, spec: {}, equip type: {}", player_level, player_class, player_spec, equipTypePreferred == EQUIP_PHY ? "physical" : equipTypePreferred == EQUIP_SPE ? "spell" : "unknown");
+    // TC_LOG_ERROR("esp.ObjectMgr", "Player level: {}, class: {}, spec: {}, equip type: {}", player_level, player_class, player_spec, equipTypePreferred == EQUIP_PHY ? "physical" : equipTypePreferred == EQUIP_SPE ? "spell" : "unknown");
 
     // 复制Quest对象
     Quest* modifiedQuest = new Quest(*originalQuest);
@@ -6458,17 +6459,22 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
         }
         // 获取对象的class和subclass
         uint32 itemClass = item->Class;
-        uint32 itemSubclass = item->SubClass;
-        uint8 itemQuality = item->Quality;
-        uint8 inventoryType = item->InventoryType;
-        uint8 itemLevel = item->ItemLevel;
 
+        if (itemClass != ITEM_CLASS_ARMOR && itemClass != ITEM_CLASS_WEAPON){
+            return false;
+        }
+
+        uint32 itemSubclass = item->SubClass;
         if (itemClass == ITEM_CLASS_ARMOR)
         {
             if (itemSubclass == ITEM_SUBCLASS_ARMOR_CLOTH || itemSubclass == ITEM_SUBCLASS_ARMOR_LEATHER ||
                 itemSubclass == ITEM_SUBCLASS_ARMOR_MAIL || itemSubclass == ITEM_SUBCLASS_ARMOR_PLATE)
                 itemSubclass = armorSubclass;
         }
+
+        uint8 itemQuality = item->Quality;
+        uint8 inventoryType = item->InventoryType;
+        uint8 itemLevel = item->ItemLevel;
 
         // 查询数据库获取新的ItemId
         // 1.item的RequiredLevel为player_level±3
@@ -6481,7 +6487,8 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
         // 预先计算上下限，避免让 SQL 处理
         int32 min_level = std::max(int8(player_level) - 5, 1);
         int32 max_level = player_level + 5;
-        std::string query = fmt::format(
+        // 定义基础查询为编译时常量
+        constexpr const char* baseQuery = 
             "SELECT entry, Quality, ItemLevel, requiredlevel "
             "FROM item_template "
             "WHERE class = {} "
@@ -6492,20 +6499,25 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
             "AND RequiredSkill = 0 " // 排除各种专业制造装备
             "AND RequiredSkillRank = 0 "
             "AND requiredspell = 0 "
-            "AND InventoryType = {} "
+            "AND RequiredReputationFaction = 0 "
             "AND entry <> {} "
             "AND BuyPrice > 0 "
             "AND SellPrice > 0 "
             "AND ItemLevel >= {} "
             "AND (requiredlevel BETWEEN {} AND {}) "
-            "AND itemset = 0 ", 
-            itemClass,
-            itemSubclass,
-            inventoryType,
-            oldItemId,
-            itemLevel,
-            min_level,
-            max_level);
+            "AND Quality <= 4 "
+            "AND itemset = 0 "; // 排除套装
+
+        std::string query;
+        if (quest_id >= 26100) {
+            // 直接使用编译时常量
+            query = fmt::format(baseQuery, 
+                itemClass, itemSubclass, oldItemId, itemLevel, min_level, max_level);
+        } else {
+            // 使用 fmt::runtime 处理运行时格式字符串
+            query = fmt::format(fmt::runtime(std::string(baseQuery) + "AND InventoryType = {} "), 
+                itemClass, itemSubclass, oldItemId, itemLevel, min_level, max_level, inventoryType);
+        }
         // LOG_ERROR("sql.sql", "query for quest {}: {}", quest_id, query.c_str());
 
         // 执行查询
@@ -6554,6 +6566,12 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
             }
         } while (result->NextRow());
 
+        // 执行shuffle
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(AItems.begin(), AItems.end(), g);
+        std::shuffle(BItems.begin(), BItems.end(), g);
+
         // 合并两个结果集
         std::vector<std::tuple<uint32, uint32, uint32>> items;
         items.reserve(AItems.size() + BItems.size());
@@ -6570,7 +6588,7 @@ Quest const* ObjectMgr::GetQuestTemplateByPlayerLevelAndClass(uint32 quest_id, u
         }
 
         uint32 selectedEntry = 0;
-        uint32 maxQualityOffset = quest_id>=26100 ? 0 : 1; //26100 and later quests are not boosted with quality
+        uint32 maxQualityOffset = quest_id>=26100 ? 4 : 1; // 限制最大品质偏移
         // 使用嵌套循环按照 range 和 qualityOffset 查找符合条件的结果
         for (int range = 1; range <= 5; ++range)
         {
