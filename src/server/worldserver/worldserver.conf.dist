@@ -1642,7 +1642,7 @@ ThreatRadius = 60
 #                     1.5 - (Enabled, 150%)
 #                     0   - (Disabled, 0%)
 
-Rate.Creature.Aggro = 1.25
+Rate.Creature.Aggro = 1
 
 #
 #    CreatureFamilyFleeAssistanceRadius
@@ -2338,7 +2338,7 @@ Rate.Drop.Item.ReferencedAmount = 1
 
 Rate.XP.Kill    = 1.5
 Rate.XP.Quest   = 2
-Rate.XP.Explore = 10
+Rate.XP.Explore = 3
 
 #
 #    Rate.XP.BattlegroundKill
@@ -2563,7 +2563,7 @@ DurabilityLossChance.Block = 0.05
 #                     MaxPlayerLevel+1 - (Disabled)
 #                     -10              - (Enabled, Level 1+ characters have 10 minute duration)
 
-Death.SicknessLevel = 11
+Death.SicknessLevel = 80
 
 #
 #    Death.CorpseReclaimDelay.PvP
