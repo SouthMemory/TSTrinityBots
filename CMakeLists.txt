@@ -26,8 +26,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   lua
-  GIT_REPOSITORY https://github.com/lua/lua
-  GIT_TAG v5.4.4
+  SOURCE_DIR D:/tswow-root/tswow-build/TrinityCore/dependencies/lua
 )
 FetchContent_MakeAvailable(lua)
 SET(LUA_ROOT ${lua_SOURCE_DIR})
@@ -43,8 +42,7 @@ endif()
 #
 FetchContent_Declare(
   sol2
-  GIT_REPOSITORY https://github.com/ThePhD/sol2
-  GIT_TAG e8e122e9ce46f4f1c0b04003d8b703fe1b89755a
+  SOURCE_DIR D:/tswow-root/tswow-build/TrinityCore/dependencies/sol2
 )
 FetchContent_MakeAvailable (sol2)
 target_compile_definitions(sol2 INTERFACE SOL_NO_CHECK_NUMBER_PRECISION)
@@ -55,8 +53,7 @@ target_compile_definitions(sol2 INTERFACE SOL_NO_CHECK_NUMBER_PRECISION)
 if(FALSE)
   FetchContent_Declare(
     sourcemap
-    GIT_REPOSITORY https://github.com/tswow/sourcemap.cpp.git
-    GIT_TAG 1523872a09ed3478f5e3d4c0cd72c01e50116e40
+    SOURCE_DIR D:/tswow-root/tswow-build/TrinityCore/dependencies/sourcemap.cpp
   )
   FetchContent_MakeAvailable (sourcemap)
   file(GLOB SOURCEMAP_SRC
@@ -95,8 +92,7 @@ SET(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
 SET(TRACY_ONLY_LOCALHOST OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
   tracy
-  GIT_REPOSITORY https://github.com/wolfpld/tracy.git
-  GIT_TAG v0.8.2
+  SOURCE_DIR D:/tswow-root/tswow-build/TrinityCore/dependencies/tracy
 )
 FetchContent_MakeAvailable (tracy)
 target_compile_definitions(TracyClient
